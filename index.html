@@ -94,16 +94,14 @@
       const list = document.getElementById("vault-list");
       try {
         const { data, error } = await supabaseClient.from('folders').select('*');
-        
         if (error) {
           list.innerHTML = `<div class="meta">Error: ${error.message}</div>`;
           return;
         }
-
         vaultData = data;
         render(vaultData);
       } catch (err) {
-        list.innerHTML = `<div class="meta">Critical system connection failure.</div>`;
+        list.innerHTML = `<div class="meta">System failure.</div>`;
       }
     }
 
@@ -111,32 +109,52 @@
       const list = document.getElementById("vault-list");
       list.innerHTML = "";
       if (!items || items.length === 0) {
-        list.innerHTML = "<div class='meta'>Vault database is empty. Add a row in Supabase to see cards.</div>";
+        list.innerHTML = "<div class='meta'>No data found. Ensure your Supabase table 'folders' has rows.</div>";
         return;
       }
       items.forEach(item => {
+        // Checking for multiple naming conventions (lowercase or capitalized)
+        const name = item.folder_name || item.FolderName || "Unnamed Folder";
+        const pass = item.folder_password || item.FolderPassword || item.password || "";
+        const theme = item.color_theme || "blue";
+        
+        let link = "#";
+        if (item.files) {
+          link = Array.isArray(item.files) ? item.files[0] : item.files;
+        }
+
         const card = document.createElement("div");
-        card.className = `card ${item.color_theme || 'blue'}`;
+        card.className = `card ${theme}`;
         card.innerHTML = `
-          <div class="file-name">${item.folder_name}</div>
+          <div class="file-name">${name}</div>
           <div class="meta">📁 SECURE VAULT</div>
-          <button onclick="unlock('${item.folder_password}', '${item.files ? item.files[0] : '#'}')">Unlock</button>
+          <button onclick="unlock('${pass}', '${link}')">Unlock</button>
         `;
         list.appendChild(card);
       });
     }
 
-    function unlock(correct, link) {
-      const pin = prompt("Enter Vault Access Pin:");
-      if (pin === correct) { 
+    function unlock(correctPin, link) {
+      if (!link || link === "#") {
+        alert("Encryption error: File link not found.");
+        return;
+      }
+      
+      const userPin = prompt("Enter Vault Access Pin:");
+      
+      // Force both to strings and trim any accidental spaces
+      if (userPin !== null && String(userPin).trim() === String(correctPin).trim()) { 
         window.open(link, '_blank'); 
-      } else if (pin !== null) { 
-        alert("Incorrect Pin."); 
+      } else if (userPin !== null) { 
+        alert("Access Denied: Incorrect Pin."); 
       }
     }
 
     function searchVault(val) {
-      const filtered = vaultData.filter(i => i.folder_name.toLowerCase().includes(val.toLowerCase()));
+      const filtered = vaultData.filter(i => {
+        const name = i.folder_name || i.FolderName || "";
+        return name.toLowerCase().includes(val.toLowerCase());
+      });
       render(filtered);
     }
 
